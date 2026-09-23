@@ -18,15 +18,18 @@ if (-not $csc) {
 if (Test-Path -LiteralPath $buildPath -PathType Container) {
     Remove-Item -LiteralPath $buildPath -Recurse -Force
 }
+if (Test-Path -LiteralPath $distPath -PathType Container) {
+    Remove-Item -LiteralPath $distPath -Recurse -Force
+}
 New-Item -ItemType Directory -Path $buildPath -Force | Out-Null
 New-Item -ItemType Directory -Path $distPath -Force | Out-Null
 
-$iconGenerator = Join-Path $buildPath 'GenerateTrayIcon.exe'
-$trayIcon = Join-Path $distPath 'tray-menu.ico'
-$launcher = Join-Path $distPath 'DesktopMenuLauncher.exe'
-$manifest = Join-Path $repoRoot 'src\DesktopMenuLauncher.manifest'
-$launcherSource = Join-Path $repoRoot 'src\TrayLauncher.cs'
-$iconGeneratorSource = Join-Path $repoRoot 'tools\GenerateTrayIcon.cs'
+$iconGenerator = Join-Path $buildPath 'GenerateFastLaunchIcon.exe'
+$trayIcon = Join-Path $distPath 'fast-launch.ico'
+$launcher = Join-Path $distPath 'FastLaunch.exe'
+$manifest = Join-Path $repoRoot 'src\FastLaunch.manifest'
+$launcherSource = Join-Path $repoRoot 'src\FastLaunch.cs'
+$iconGeneratorSource = Join-Path $repoRoot 'tools\GenerateFastLaunchIcon.cs'
 
 & $csc /nologo /target:exe "/out:$iconGenerator" /reference:System.Drawing.dll $iconGeneratorSource
 if ($LASTEXITCODE -ne 0) { throw 'Icon generator compilation failed.' }
@@ -44,7 +47,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Tray icon generation failed.' }
     $launcherSource
 if ($LASTEXITCODE -ne 0) { throw 'Launcher compilation failed.' }
 
-Copy-Item -LiteralPath (Join-Path $repoRoot 'config\desktop-menu-config.json') -Destination $distPath -Force
+Copy-Item -LiteralPath (Join-Path $repoRoot 'config\fast-launch-config.json') -Destination $distPath -Force
 Get-ChildItem -LiteralPath (Join-Path $repoRoot 'scripts') -File | Copy-Item -Destination $distPath -Force
 
 Write-Output "Build complete: $distPath"

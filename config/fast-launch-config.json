@@ -1,7 +1,7 @@
 {
   "sourcePath": "%USERPROFILE%\\Desktop\\menu",
-  "trayIconPath": "tray-menu.ico",
-  "menuTitle": "Мои программы",
+  "trayIconPath": "fast-launch.ico",
+  "menuTitle": "Fast Launch",
   "defaultCategory": "Другое",
   "categoryOrder": [
     "Игры",

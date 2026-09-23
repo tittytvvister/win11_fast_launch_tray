@@ -161,8 +161,8 @@ internal sealed class TrayLauncher : ApplicationContext
             AutoClose = true,
             ShowImageMargin = true,
             ShowCheckMargin = false,
-            Padding = new Padding(4),
-            ImageScalingSize = new Size(20, 20)
+            Padding = new Padding(8),
+            ImageScalingSize = new Size(28, 28)
         };
         menu.Opening += delegate { RebuildMenu(); };
 
@@ -180,7 +180,7 @@ internal sealed class TrayLauncher : ApplicationContext
         trayIcon = new NotifyIcon
         {
             Icon = SystemIcons.Application,
-            Text = "My Programs",
+            Text = "Fast Launch",
             Visible = true
         };
         trayIcon.MouseUp += OnTrayClick;
@@ -190,7 +190,7 @@ internal sealed class TrayLauncher : ApplicationContext
 
     private string ConfigPath
     {
-        get { return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "desktop-menu-config.json"); }
+        get { return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "fast-launch-config.json"); }
     }
 
     private void LoadConfig()
@@ -201,7 +201,7 @@ internal sealed class TrayLauncher : ApplicationContext
             config.sourcePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "menu");
         config.sourcePath = Environment.ExpandEnvironmentVariables(config.sourcePath);
         if (string.IsNullOrWhiteSpace(config.menuTitle))
-            config.menuTitle = "My Programs";
+            config.menuTitle = "Fast Launch";
         if (string.IsNullOrWhiteSpace(config.defaultCategory))
             config.defaultCategory = "Other";
 
@@ -277,13 +277,13 @@ internal sealed class TrayLauncher : ApplicationContext
             {
                 ToolStripMenuItem categoryItem = new ToolStripMenuItem(group.Key)
                 {
-                    Padding = new Padding(8, 5, 8, 5)
+                    Padding = new Padding(8)
                 };
                 foreach (ShortcutItem item in group.OrderBy(value => value.Name, StringComparer.CurrentCultureIgnoreCase))
                 {
                     ToolStripMenuItem shortcutItem = new ToolStripMenuItem(item.Name)
                     {
-                        Padding = new Padding(8, 5, 8, 5)
+                        Padding = new Padding(8)
                     };
                     shortcutItem.Tag = item.Path;
                     shortcutItem.Click += LaunchShortcut;
@@ -305,27 +305,35 @@ internal sealed class TrayLauncher : ApplicationContext
 
             if (items.Count == 0)
             {
-                ToolStripMenuItem emptyItem = new ToolStripMenuItem("\u042f\u0440\u043b\u044b\u043a\u0438 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u044b") { Enabled = false };
+                ToolStripMenuItem emptyItem = new ToolStripMenuItem("\u042f\u0440\u043b\u044b\u043a\u0438 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u044b")
+                {
+                    Enabled = false,
+                    Padding = new Padding(8)
+                };
                 menu.Items.Add(emptyItem);
             }
         }
         catch (Exception ex)
         {
-            ToolStripMenuItem errorItem = new ToolStripMenuItem("\u041e\u0448\u0438\u0431\u043a\u0430: " + ex.Message) { Enabled = false };
+            ToolStripMenuItem errorItem = new ToolStripMenuItem("\u041e\u0448\u0438\u0431\u043a\u0430: " + ex.Message)
+            {
+                Enabled = false,
+                Padding = new Padding(8)
+            };
             menu.Items.Add(errorItem);
         }
 
         menu.Items.Add(new ToolStripSeparator());
         ToolStripMenuItem openFolder = new ToolStripMenuItem("\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u043f\u0430\u043f\u043a\u0443")
         {
-            Padding = new Padding(8, 5, 8, 5)
+            Padding = new Padding(8)
         };
         openFolder.Click += delegate { OpenPath(config.sourcePath); };
         menu.Items.Add(openFolder);
 
         ToolStripMenuItem exitItem = new ToolStripMenuItem("\u0412\u044b\u0445\u043e\u0434")
         {
-            Padding = new Padding(8, 5, 8, 5)
+            Padding = new Padding(8)
         };
         exitItem.Click += delegate { ExitLauncher(); };
         menu.Items.Add(exitItem);
@@ -349,7 +357,7 @@ internal sealed class TrayLauncher : ApplicationContext
             using (Icon icon = (Icon)Icon.FromHandle(info.hIcon).Clone())
             using (Bitmap source = icon.ToBitmap())
             {
-                Bitmap output = new Bitmap(20, 20, PixelFormat.Format32bppArgb);
+                Bitmap output = new Bitmap(28, 28, PixelFormat.Format32bppArgb);
                 using (Graphics graphics = Graphics.FromImage(output))
                 {
                     graphics.Clear(Color.Transparent);
@@ -358,7 +366,7 @@ internal sealed class TrayLauncher : ApplicationContext
                     graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
                     graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
                     graphics.SmoothingMode = SmoothingMode.HighQuality;
-                    graphics.DrawImage(source, new Rectangle(1, 1, 18, 18));
+                    graphics.DrawImage(source, new Rectangle(1, 1, 26, 26));
                 }
                 return output;
             }
@@ -402,7 +410,7 @@ internal sealed class TrayLauncher : ApplicationContext
         dropDown.BackColor = palette.Background;
         dropDown.ForeColor = palette.Text;
         dropDown.Font = menu.Font;
-        dropDown.Padding = new Padding(4);
+        dropDown.Padding = new Padding(8);
 
         ToolStripDropDownMenu dropDownMenu = dropDown as ToolStripDropDownMenu;
         if (dropDownMenu != null)
@@ -479,7 +487,7 @@ internal sealed class TrayLauncher : ApplicationContext
         }
         catch (Exception ex)
         {
-            MessageBox.Show(ex.Message, "My Programs", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(ex.Message, "Fast Launch", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 
@@ -577,7 +585,7 @@ internal static class Program
     {
         NativeMethods.EnablePerMonitorDpi();
         bool createdNew;
-        using (Mutex mutex = new Mutex(true, "Win11FastLaunchTray", out createdNew))
+        using (Mutex mutex = new Mutex(true, "FastLaunch", out createdNew))
         {
             if (!createdNew)
                 return;
