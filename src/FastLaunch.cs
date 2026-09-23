@@ -115,6 +115,22 @@ internal sealed class Win11Renderer : ToolStripProfessionalRenderer
         base.OnRenderArrow(e);
     }
 
+    protected override void OnRenderItemImage(ToolStripItemImageRenderEventArgs e)
+    {
+        if (e.Image == null)
+            return;
+
+        const int iconSize = 28;
+        int x = e.ImageRectangle.Left + Math.Max(0, (e.ImageRectangle.Width - iconSize) / 2);
+        int y = Math.Max(0, (e.Item.Height - iconSize) / 2);
+        Rectangle target = new Rectangle(x, y, iconSize, iconSize);
+
+        e.Graphics.CompositingQuality = CompositingQuality.HighQuality;
+        e.Graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
+        e.Graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
+        e.Graphics.DrawImage(e.Image, target);
+    }
+
     protected override void OnRenderSeparator(ToolStripSeparatorRenderEventArgs e)
     {
         int y = e.Item.Height / 2;
@@ -161,7 +177,7 @@ internal sealed class TrayLauncher : ApplicationContext
             AutoClose = true,
             ShowImageMargin = true,
             ShowCheckMargin = false,
-            Padding = new Padding(8),
+            Padding = Padding.Empty,
             ImageScalingSize = new Size(28, 28)
         };
         menu.Opening += delegate { RebuildMenu(); };
@@ -277,13 +293,19 @@ internal sealed class TrayLauncher : ApplicationContext
             {
                 ToolStripMenuItem categoryItem = new ToolStripMenuItem(group.Key)
                 {
-                    Padding = new Padding(8)
+                    Padding = new Padding(8),
+                    TextAlign = ContentAlignment.MiddleLeft,
+                    ImageAlign = ContentAlignment.MiddleCenter,
+                    TextImageRelation = TextImageRelation.ImageBeforeText
                 };
                 foreach (ShortcutItem item in group.OrderBy(value => value.Name, StringComparer.CurrentCultureIgnoreCase))
                 {
                     ToolStripMenuItem shortcutItem = new ToolStripMenuItem(item.Name)
                     {
-                        Padding = new Padding(8)
+                        Padding = new Padding(8),
+                        TextAlign = ContentAlignment.MiddleLeft,
+                        ImageAlign = ContentAlignment.MiddleCenter,
+                        TextImageRelation = TextImageRelation.ImageBeforeText
                     };
                     shortcutItem.Tag = item.Path;
                     shortcutItem.Click += LaunchShortcut;
@@ -299,7 +321,12 @@ internal sealed class TrayLauncher : ApplicationContext
                     categoryItem.DropDownItems.Add(shortcutItem);
                 }
                 ToolStripDropDown categoryDropDown = categoryItem.DropDown;
-                categoryItem.DropDownOpening += delegate { ApplyDropDownStyle(categoryDropDown); };
+                categoryItem.DropDownOpening += delegate
+                {
+                    ApplyDropDownStyle(categoryDropDown);
+                    ApplyOuterSpacing(categoryDropDown);
+                };
+                ApplyOuterSpacing(categoryDropDown);
                 menu.Items.Add(categoryItem);
             }
 
@@ -308,7 +335,8 @@ internal sealed class TrayLauncher : ApplicationContext
                 ToolStripMenuItem emptyItem = new ToolStripMenuItem("\u042f\u0440\u043b\u044b\u043a\u0438 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u044b")
                 {
                     Enabled = false,
-                    Padding = new Padding(8)
+                    Padding = new Padding(8),
+                    TextAlign = ContentAlignment.MiddleLeft
                 };
                 menu.Items.Add(emptyItem);
             }
@@ -318,7 +346,8 @@ internal sealed class TrayLauncher : ApplicationContext
             ToolStripMenuItem errorItem = new ToolStripMenuItem("\u041e\u0448\u0438\u0431\u043a\u0430: " + ex.Message)
             {
                 Enabled = false,
-                Padding = new Padding(8)
+                Padding = new Padding(8),
+                TextAlign = ContentAlignment.MiddleLeft
             };
             menu.Items.Add(errorItem);
         }
@@ -326,17 +355,45 @@ internal sealed class TrayLauncher : ApplicationContext
         menu.Items.Add(new ToolStripSeparator());
         ToolStripMenuItem openFolder = new ToolStripMenuItem("\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u043f\u0430\u043f\u043a\u0443")
         {
-            Padding = new Padding(8)
+            Padding = new Padding(8),
+            TextAlign = ContentAlignment.MiddleLeft
         };
         openFolder.Click += delegate { OpenPath(config.sourcePath); };
         menu.Items.Add(openFolder);
 
         ToolStripMenuItem exitItem = new ToolStripMenuItem("\u0412\u044b\u0445\u043e\u0434")
         {
-            Padding = new Padding(8)
+            Padding = new Padding(8),
+            TextAlign = ContentAlignment.MiddleLeft
         };
         exitItem.Click += delegate { ExitLauncher(); };
         menu.Items.Add(exitItem);
+        ApplyOuterSpacing(menu);
+    }
+
+    private static void ApplyOuterSpacing(ToolStripDropDown dropDown)
+    {
+        List<ToolStripItem> items = dropDown.Items.Cast<ToolStripItem>()
+            .Where(item => item.Available)
+            .ToList();
+
+        for (int i = 0; i < items.Count; i++)
+        {
+            ToolStripItem item = items[i];
+            int top = i == 0 ? 8 : 0;
+            int bottom = i == items.Count - 1 ? 8 : 0;
+
+            if (item is ToolStripSeparator)
+            {
+                top = Math.Max(top, 4);
+                bottom = Math.Max(bottom, 4);
+            }
+
+            item.Margin = new Padding(8, top, 8, bottom);
+        }
+
+        dropDown.Padding = Padding.Empty;
+        dropDown.PerformLayout();
     }
 
     private static Bitmap CreateMenuImage(string path)
@@ -410,7 +467,7 @@ internal sealed class TrayLauncher : ApplicationContext
         dropDown.BackColor = palette.Background;
         dropDown.ForeColor = palette.Text;
         dropDown.Font = menu.Font;
-        dropDown.Padding = new Padding(8);
+        dropDown.Padding = Padding.Empty;
 
         ToolStripDropDownMenu dropDownMenu = dropDown as ToolStripDropDownMenu;
         if (dropDownMenu != null)
