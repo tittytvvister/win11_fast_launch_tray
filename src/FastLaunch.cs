@@ -106,7 +106,11 @@ internal sealed class Win11Renderer : ToolStripProfessionalRenderer
     protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
     {
         e.TextColor = e.Item.Enabled ? palette.Text : palette.MutedText;
-        base.OnRenderItemText(e);
+        Rectangle textBounds = e.TextRectangle;
+        int leftOffset = Math.Max(1, (int)Math.Round(8F * e.Graphics.DpiX / 96F));
+        textBounds.X += leftOffset;
+        textBounds.Width = Math.Max(1, textBounds.Width - leftOffset);
+        TextRenderer.DrawText(e.Graphics, e.Text, e.TextFont, textBounds, e.TextColor, e.TextFormat);
     }
 
     protected override void OnRenderArrow(ToolStripArrowRenderEventArgs e)
@@ -121,6 +125,8 @@ internal sealed class Win11Renderer : ToolStripProfessionalRenderer
             return;
 
         Rectangle target = e.ImageRectangle;
+        int leftOffset = Math.Max(1, (int)Math.Round(8F * e.Graphics.DpiX / 96F));
+        target.X += leftOffset;
         // Segoe UI's visible glyphs sit above the geometric center of its line box.
         int visualOffset = Math.Max(1, (int)Math.Round(6F * e.Graphics.DpiY / 96F));
         target.Y = Math.Max(0, (e.Item.Height - target.Height) / 2 - visualOffset);
