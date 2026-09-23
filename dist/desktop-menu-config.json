@@ -1,0 +1,36 @@
+{
+  "sourcePath": "%USERPROFILE%\\Desktop\\menu",
+  "trayIconPath": "tray-menu.ico",
+  "menuTitle": "Мои программы",
+  "defaultCategory": "Другое",
+  "categoryOrder": [
+    "Игры",
+    "VR",
+    "Диагностика и разгон",
+    "Разработка",
+    "Работа",
+    "Другое"
+  ],
+  "rules": [
+    {
+      "category": "Игры",
+      "match": "Cyberpunk|Far Cry|Half-Life|Neverhood|StarCraft"
+    },
+    {
+      "category": "VR",
+      "match": "SideQuest|SteamVR|Virtual Desktop"
+    },
+    {
+      "category": "Диагностика и разгон",
+      "match": "CrystalDiskMark|FurMark|Afterburner|GPU-Z"
+    },
+    {
+      "category": "Разработка",
+      "match": "Docker"
+    },
+    {
+      "category": "Работа",
+      "match": "Recordly"
+    }
+  ]
+}
