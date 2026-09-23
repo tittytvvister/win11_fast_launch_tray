@@ -94,7 +94,7 @@ internal sealed class Win11Renderer : ToolStripProfessionalRenderer
         if (!e.Item.Selected)
             return;
 
-        Rectangle bounds = new Rectangle(4, 1, Math.Max(1, e.Item.Width - 8), Math.Max(1, e.Item.Height - 2));
+        Rectangle bounds = new Rectangle(4, 4, Math.Max(1, e.Item.Width - 8), Math.Max(1, e.Item.Height - 8));
         using (GraphicsPath path = RoundedRectangle(bounds, 4))
         using (SolidBrush brush = new SolidBrush(palette.Hover))
         {
@@ -110,13 +110,37 @@ internal sealed class Win11Renderer : ToolStripProfessionalRenderer
         int leftOffset = Math.Max(1, (int)Math.Round(8F * e.Graphics.DpiX / 96F));
         textBounds.X += leftOffset;
         textBounds.Width = Math.Max(1, textBounds.Width - leftOffset);
-        TextRenderer.DrawText(e.Graphics, e.Text, e.TextFont, textBounds, e.TextColor, e.TextFormat);
+        textBounds.Y = 0;
+        textBounds.Height = e.Item.Height;
+        TextFormatFlags textFormat = (e.TextFormat & ~(TextFormatFlags.VerticalCenter | TextFormatFlags.Bottom)) |
+            TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine;
+        TextRenderer.DrawText(e.Graphics, e.Text, e.TextFont, textBounds, e.TextColor, textFormat);
     }
 
     protected override void OnRenderArrow(ToolStripArrowRenderEventArgs e)
     {
-        e.ArrowColor = palette.MutedText;
-        base.OnRenderArrow(e);
+        if (!(e.Item is ToolStripMenuItem))
+        {
+            e.ArrowColor = palette.MutedText;
+            base.OnRenderArrow(e);
+            return;
+        }
+
+        int scale = Math.Max(3, (int)Math.Round(4F * e.Graphics.DpiX / 96F));
+        int centerX = e.ArrowRectangle.Left + e.ArrowRectangle.Width / 2;
+        int centerY = e.Item.Height / 2;
+        Point[] points =
+        {
+            new Point(centerX - scale / 2, centerY - scale),
+            new Point(centerX - scale / 2, centerY + scale),
+            new Point(centerX + scale / 2, centerY)
+        };
+
+        using (SolidBrush brush = new SolidBrush(palette.MutedText))
+        {
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            e.Graphics.FillPolygon(brush, points);
+        }
     }
 
     protected override void OnRenderItemImage(ToolStripItemImageRenderEventArgs e)
@@ -127,9 +151,7 @@ internal sealed class Win11Renderer : ToolStripProfessionalRenderer
         Rectangle target = e.ImageRectangle;
         int leftOffset = Math.Max(1, (int)Math.Round(8F * e.Graphics.DpiX / 96F));
         target.X += leftOffset;
-        // Segoe UI's visible glyphs sit above the geometric center of its line box.
-        int visualOffset = Math.Max(1, (int)Math.Round(6F * e.Graphics.DpiY / 96F));
-        target.Y = Math.Max(0, (e.Item.Height - target.Height) / 2 - visualOffset);
+        target.Y = Math.Max(0, (e.Item.Height - target.Height) / 2);
 
         e.Graphics.CompositingQuality = CompositingQuality.HighQuality;
         e.Graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
@@ -168,7 +190,7 @@ internal sealed class Win11ContextMenuStrip : ContextMenuStrip
 {
     protected override Padding DefaultPadding
     {
-        get { return new Padding(8); }
+        get { return new Padding(8, 8, 8, 12); }
     }
 }
 
@@ -176,7 +198,7 @@ internal sealed class Win11DropDownMenu : ToolStripDropDownMenu
 {
     protected override Padding DefaultPadding
     {
-        get { return new Padding(ImageScalingSize.Width + 5, 8, 8, 8); }
+        get { return new Padding(ImageScalingSize.Width + 5, 8, 8, 12); }
     }
 }
 
@@ -449,6 +471,11 @@ internal sealed class TrayLauncher : ApplicationContext
             using (Bitmap source = icon.ToBitmap())
             {
                 Bitmap output = new Bitmap(28, 28, PixelFormat.Format32bppArgb);
+                Rectangle visibleBounds = FindVisibleBounds(source);
+                float scale = Math.Min(26F / visibleBounds.Width, 26F / visibleBounds.Height);
+                int width = Math.Max(1, (int)Math.Round(visibleBounds.Width * scale));
+                int height = Math.Max(1, (int)Math.Round(visibleBounds.Height * scale));
+                Rectangle targetBounds = new Rectangle((28 - width) / 2, (28 - height) / 2, width, height);
                 using (Graphics graphics = Graphics.FromImage(output))
                 {
                     graphics.Clear(Color.Transparent);
@@ -457,7 +484,7 @@ internal sealed class TrayLauncher : ApplicationContext
                     graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
                     graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
                     graphics.SmoothingMode = SmoothingMode.HighQuality;
-                    graphics.DrawImage(source, new Rectangle(1, 1, 26, 26));
+                    graphics.DrawImage(source, targetBounds, visibleBounds, GraphicsUnit.Pixel);
                 }
                 return output;
             }
@@ -466,6 +493,32 @@ internal sealed class TrayLauncher : ApplicationContext
         {
             NativeMethods.DestroyIcon(info.hIcon);
         }
+    }
+
+    private static Rectangle FindVisibleBounds(Bitmap bitmap)
+    {
+        int left = bitmap.Width;
+        int top = bitmap.Height;
+        int right = -1;
+        int bottom = -1;
+
+        for (int y = 0; y < bitmap.Height; y++)
+        {
+            for (int x = 0; x < bitmap.Width; x++)
+            {
+                if (bitmap.GetPixel(x, y).A <= 8)
+                    continue;
+
+                left = Math.Min(left, x);
+                top = Math.Min(top, y);
+                right = Math.Max(right, x);
+                bottom = Math.Max(bottom, y);
+            }
+        }
+
+        return right >= left && bottom >= top
+            ? Rectangle.FromLTRB(left, top, right + 1, bottom + 1)
+            : new Rectangle(0, 0, bitmap.Width, bitmap.Height);
     }
 
     private void ApplyTheme()
