@@ -120,10 +120,10 @@ internal sealed class Win11Renderer : ToolStripProfessionalRenderer
         if (e.Image == null)
             return;
 
-        const int iconSize = 28;
-        int x = e.ImageRectangle.Left + Math.Max(0, (e.ImageRectangle.Width - iconSize) / 2);
-        int y = Math.Max(0, (e.Item.Height - iconSize) / 2);
-        Rectangle target = new Rectangle(x, y, iconSize, iconSize);
+        Rectangle target = e.ImageRectangle;
+        // Segoe UI's visible glyphs sit above the geometric center of its line box.
+        int visualOffset = Math.Max(1, (int)Math.Round(6F * e.Graphics.DpiY / 96F));
+        target.Y = Math.Max(0, (e.Item.Height - target.Height) / 2 - visualOffset);
 
         e.Graphics.CompositingQuality = CompositingQuality.HighQuality;
         e.Graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
@@ -158,6 +158,22 @@ internal sealed class Win11Renderer : ToolStripProfessionalRenderer
     }
 }
 
+internal sealed class Win11ContextMenuStrip : ContextMenuStrip
+{
+    protected override Padding DefaultPadding
+    {
+        get { return new Padding(8); }
+    }
+}
+
+internal sealed class Win11DropDownMenu : ToolStripDropDownMenu
+{
+    protected override Padding DefaultPadding
+    {
+        get { return new Padding(ImageScalingSize.Width + 5, 8, 8, 8); }
+    }
+}
+
 internal sealed class TrayLauncher : ApplicationContext
 {
     private readonly NotifyIcon trayIcon;
@@ -172,12 +188,11 @@ internal sealed class TrayLauncher : ApplicationContext
 
     public TrayLauncher()
     {
-        menu = new ContextMenuStrip
+        menu = new Win11ContextMenuStrip
         {
             AutoClose = true,
-            ShowImageMargin = true,
+            ShowImageMargin = false,
             ShowCheckMargin = false,
-            Padding = Padding.Empty,
             ImageScalingSize = new Size(28, 28)
         };
         menu.Opening += delegate { RebuildMenu(); };
@@ -202,11 +217,31 @@ internal sealed class TrayLauncher : ApplicationContext
         trayIcon.MouseUp += OnTrayClick;
 
         LoadConfig();
+
+        if (Environment.GetCommandLineArgs().Any(value => string.Equals(value, "--preview", StringComparison.OrdinalIgnoreCase)))
+        {
+            System.Windows.Forms.Timer previewTimer = new System.Windows.Forms.Timer { Interval = 250 };
+            previewTimer.Tick += delegate
+            {
+                previewTimer.Stop();
+                RebuildMenu();
+                ownerWindow.Show();
+                ownerWindow.Activate();
+                NativeMethods.SetForegroundWindow(ownerWindow.Handle);
+                menu.Show(Cursor.Position);
+            };
+            previewTimer.Start();
+        }
     }
 
     private string ConfigPath
     {
-        get { return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "fast-launch-config.json"); }
+        get { return Path.Combine(InstallDirectory, "fast-launch-config.json"); }
+    }
+
+    private string InstallDirectory
+    {
+        get { return Path.GetDirectoryName(typeof(TrayLauncher).Assembly.Location); }
     }
 
     private void LoadConfig()
@@ -231,7 +266,7 @@ internal sealed class TrayLauncher : ApplicationContext
         if (!string.IsNullOrWhiteSpace(iconPath))
             iconPath = Environment.ExpandEnvironmentVariables(iconPath);
         if (!string.IsNullOrWhiteSpace(iconPath) && !Path.IsPathRooted(iconPath))
-            iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, iconPath);
+            iconPath = Path.Combine(InstallDirectory, iconPath);
 
         if (string.Equals(iconPath, loadedTrayIconPath, StringComparison.OrdinalIgnoreCase))
             return;
@@ -240,7 +275,7 @@ internal sealed class TrayLauncher : ApplicationContext
         if (!string.IsNullOrWhiteSpace(iconPath) && File.Exists(iconPath))
             nextIcon = new Icon(iconPath);
         if (nextIcon == null)
-            nextIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+            nextIcon = Icon.ExtractAssociatedIcon(typeof(TrayLauncher).Assembly.Location);
 
         Icon oldIcon = customTrayIcon;
         customTrayIcon = nextIcon;
@@ -297,6 +332,12 @@ internal sealed class TrayLauncher : ApplicationContext
                     TextAlign = ContentAlignment.MiddleLeft,
                     ImageAlign = ContentAlignment.MiddleCenter,
                     TextImageRelation = TextImageRelation.ImageBeforeText
+                };
+                categoryItem.DropDown = new Win11DropDownMenu
+                {
+                    ShowImageMargin = true,
+                    ShowCheckMargin = false,
+                    ImageScalingSize = new Size(28, 28)
                 };
                 foreach (ShortcutItem item in group.OrderBy(value => value.Name, StringComparer.CurrentCultureIgnoreCase))
                 {
@@ -377,22 +418,9 @@ internal sealed class TrayLauncher : ApplicationContext
             .Where(item => item.Available)
             .ToList();
 
-        for (int i = 0; i < items.Count; i++)
-        {
-            ToolStripItem item = items[i];
-            int top = i == 0 ? 8 : 0;
-            int bottom = i == items.Count - 1 ? 8 : 0;
+        foreach (ToolStripItem item in items)
+            item.Margin = Padding.Empty;
 
-            if (item is ToolStripSeparator)
-            {
-                top = Math.Max(top, 4);
-                bottom = Math.Max(bottom, 4);
-            }
-
-            item.Margin = new Padding(8, top, 8, bottom);
-        }
-
-        dropDown.Padding = Padding.Empty;
         dropDown.PerformLayout();
     }
 
@@ -467,12 +495,10 @@ internal sealed class TrayLauncher : ApplicationContext
         dropDown.BackColor = palette.Background;
         dropDown.ForeColor = palette.Text;
         dropDown.Font = menu.Font;
-        dropDown.Padding = Padding.Empty;
-
         ToolStripDropDownMenu dropDownMenu = dropDown as ToolStripDropDownMenu;
         if (dropDownMenu != null)
         {
-            dropDownMenu.ShowImageMargin = true;
+            dropDownMenu.ShowImageMargin = !ReferenceEquals(dropDown, menu);
             dropDownMenu.ShowCheckMargin = false;
         }
 
