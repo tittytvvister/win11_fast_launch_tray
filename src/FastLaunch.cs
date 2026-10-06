@@ -8,26 +8,17 @@ using System.IO;
 using System.Linq;
 using Microsoft.Win32;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Web.Script.Serialization;
 using System.Windows.Forms;
 using System.Runtime.InteropServices;
-
-internal sealed class MenuRule
-{
-    public string category { get; set; }
-    public string match { get; set; }
-}
 
 internal sealed class MenuConfig
 {
     public string sourcePath { get; set; }
     public string trayIconPath { get; set; }
     public string menuTitle { get; set; }
-    public string defaultCategory { get; set; }
     public string[] categoryOrder { get; set; }
-    public MenuRule[] rules { get; set; }
 }
 
 internal sealed class ShortcutItem
@@ -281,8 +272,6 @@ internal sealed class TrayLauncher : ApplicationContext
         config.sourcePath = Environment.ExpandEnvironmentVariables(config.sourcePath);
         if (string.IsNullOrWhiteSpace(config.menuTitle))
             config.menuTitle = "Fast Launch";
-        if (string.IsNullOrWhiteSpace(config.defaultCategory))
-            config.defaultCategory = "Other";
 
         trayIcon.Text = config.menuTitle.Length > 63 ? config.menuTitle.Substring(0, 63) : config.menuTitle;
         ApplyTrayIcon();
@@ -340,6 +329,7 @@ internal sealed class TrayLauncher : ApplicationContext
         {
             LoadConfig();
             ApplyTheme();
+            List<string> categories = ReadCategories();
             List<ShortcutItem> items = ReadShortcuts();
             Dictionary<string, int> order = new Dictionary<string, int>(StringComparer.CurrentCultureIgnoreCase);
             if (config.categoryOrder != null)
@@ -348,13 +338,13 @@ internal sealed class TrayLauncher : ApplicationContext
                     order[config.categoryOrder[i]] = i;
             }
 
-            var groups = items.GroupBy(item => item.Category)
-                .OrderBy(group => order.ContainsKey(group.Key) ? order[group.Key] : 1000)
-                .ThenBy(group => group.Key, StringComparer.CurrentCultureIgnoreCase);
+            var orderedCategories = categories
+                .OrderBy(category => order.ContainsKey(category) ? order[category] : 1000)
+                .ThenBy(category => category, StringComparer.CurrentCultureIgnoreCase);
 
-            foreach (var group in groups)
+            foreach (string category in orderedCategories)
             {
-                ToolStripMenuItem categoryItem = new ToolStripMenuItem(group.Key)
+                ToolStripMenuItem categoryItem = new ToolStripMenuItem(category)
                 {
                     Padding = new Padding(8),
                     TextAlign = ContentAlignment.MiddleLeft,
@@ -367,7 +357,12 @@ internal sealed class TrayLauncher : ApplicationContext
                     ShowCheckMargin = false,
                     ImageScalingSize = new Size(28, 28)
                 };
-                foreach (ShortcutItem item in group.OrderBy(value => value.Name, StringComparer.CurrentCultureIgnoreCase))
+                List<ShortcutItem> categoryShortcuts = items
+                    .Where(item => string.Equals(item.Category, category, StringComparison.CurrentCultureIgnoreCase))
+                    .OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
+                    .ToList();
+
+                foreach (ShortcutItem item in categoryShortcuts)
                 {
                     ToolStripMenuItem shortcutItem = new ToolStripMenuItem(item.Name)
                     {
@@ -389,6 +384,17 @@ internal sealed class TrayLauncher : ApplicationContext
                     }
                     categoryItem.DropDownItems.Add(shortcutItem);
                 }
+
+                if (categoryShortcuts.Count == 0)
+                {
+                    categoryItem.DropDownItems.Add(new ToolStripMenuItem("\u041f\u0430\u043f\u043a\u0430 \u043f\u0443\u0441\u0442\u0430")
+                    {
+                        Enabled = false,
+                        Padding = new Padding(8),
+                        TextAlign = ContentAlignment.MiddleLeft
+                    });
+                }
+
                 ToolStripDropDown categoryDropDown = categoryItem.DropDown;
                 categoryItem.DropDownOpening += delegate
                 {
@@ -399,9 +405,9 @@ internal sealed class TrayLauncher : ApplicationContext
                 menu.Items.Add(categoryItem);
             }
 
-            if (items.Count == 0)
+            if (categories.Count == 0)
             {
-                ToolStripMenuItem emptyItem = new ToolStripMenuItem("\u042f\u0440\u043b\u044b\u043a\u0438 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u044b")
+                ToolStripMenuItem emptyItem = new ToolStripMenuItem("\u0421\u043e\u0437\u0434\u0430\u0439\u0442\u0435 \u043f\u0430\u043f\u043a\u0443 \u043a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u0438")
                 {
                     Enabled = false,
                     Padding = new Padding(8),
@@ -584,34 +590,31 @@ internal sealed class TrayLauncher : ApplicationContext
                 ? directory.Substring(config.sourcePath.TrimEnd('\\').Length).TrimStart('\\')
                 : string.Empty;
 
+            if (string.IsNullOrWhiteSpace(relativeDirectory))
+                continue;
+
             string name = Path.GetFileNameWithoutExtension(path);
             result.Add(new ShortcutItem
             {
                 Name = name,
                 Path = path,
-                Category = GetCategory(name, relativeDirectory)
+                Category = relativeDirectory.Split('\\')[0]
             });
         }
 
         return result;
     }
 
-    private string GetCategory(string name, string relativeDirectory)
+    private List<string> ReadCategories()
     {
-        if (!string.IsNullOrWhiteSpace(relativeDirectory))
-            return relativeDirectory.Split('\\')[0];
+        if (!Directory.Exists(config.sourcePath))
+            return new List<string>();
 
-        if (config.rules != null)
-        {
-            foreach (MenuRule rule in config.rules)
-            {
-                if (!string.IsNullOrWhiteSpace(rule.match) &&
-                    Regex.IsMatch(name, rule.match, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
-                    return rule.category;
-            }
-        }
-
-        return config.defaultCategory;
+        return Directory.EnumerateDirectories(config.sourcePath, "*", SearchOption.TopDirectoryOnly)
+            .Select(Path.GetFileName)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
     }
 
     private void LaunchShortcut(object sender, EventArgs e)

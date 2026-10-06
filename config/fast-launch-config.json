@@ -2,7 +2,6 @@
   "sourcePath": "%USERPROFILE%\\Desktop\\menu",
   "trayIconPath": "fast-launch.ico",
   "menuTitle": "Fast Launch",
-  "defaultCategory": "Другое",
   "categoryOrder": [
     "Игры",
     "VR",
@@ -10,27 +9,5 @@
     "Разработка",
     "Работа",
     "Другое"
-  ],
-  "rules": [
-    {
-      "category": "Игры",
-      "match": "Cyberpunk|Far Cry|Half-Life|Neverhood|StarCraft"
-    },
-    {
-      "category": "VR",
-      "match": "SideQuest|SteamVR|Virtual Desktop"
-    },
-    {
-      "category": "Диагностика и разгон",
-      "match": "CrystalDiskMark|FurMark|Afterburner|GPU-Z"
-    },
-    {
-      "category": "Разработка",
-      "match": "Docker"
-    },
-    {
-      "category": "Работа",
-      "match": "Recordly"
-    }
   ]
 }
